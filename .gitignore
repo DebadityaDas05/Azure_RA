@@ -1,0 +1,22 @@
+# Local settings / secrets
+api/local.settings.json
+.env
+.env.local
+.env.*
+
+# Python virtual environment & cache
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Node / SWA CLI directories
+node_modules/
+.swa/
+
+# OS/IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
