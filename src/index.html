@@ -251,6 +251,44 @@
   .entity-chip .cat{ color: var(--highlight); margin-left: 4px; }
   .entity-empty{ color: var(--ink-soft); }
 
+  /* ---------- New Features styles ---------- */
+  .language-block {
+    width: 100%;
+    text-align: center;
+    margin-top: 12px;
+  }
+  .language-badge {
+    background: var(--paper-line);
+    color: var(--ink);
+    padding: 6px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    font-weight: 600;
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid rgba(30,40,30,0.08);
+  }
+  .section-divider {
+    margin-top: 22px;
+    border-top: 1px dashed var(--paper-line);
+    padding-top: 16px;
+  }
+  .summary-text {
+    font-style: italic;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  .redacted-box {
+    background: rgba(30,40,30,0.04);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    border-left: 3px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 8px 0 12px;
+  }
+
   .foot{
     text-align:center;
     padding: 18px 20px 32px;
@@ -317,6 +355,10 @@
             <div class="bar-row"><span class="mono tiny">neg</span><span class="bar"><span id="barNeg" class="bar-fill neg"></span></span></div>
           </div>
         </div>
+        <div class="language-block">
+          <p class="mono small label">language</p>
+          <div id="languageBadge" class="language-badge">-</div>
+        </div>
       </div>
 
       <div class="page-body">
@@ -327,6 +369,20 @@
           <p class="sheet-label">named entities</p>
           <div id="entityList" class="entity-list mono small"></div>
         </div>
+
+        <div id="summaryBlock" class="entities-block section-divider" hidden>
+          <p class="sheet-label">extractive summary</p>
+          <div id="summaryContainer" class="marked-text summary-text"></div>
+        </div>
+
+        <div id="piiBlock" class="entities-block section-divider" hidden>
+          <p class="sheet-label">redacted copy (pii masked)</p>
+          <p id="redactedText" class="redacted-box"></p>
+          <div id="piiEntitiesContainer">
+            <p class="mono tiny" style="color: var(--ink-soft); margin-bottom: 6px;">pii entities detected</p>
+            <div id="piiList" class="entity-list mono small"></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -334,7 +390,7 @@
   </main>
 
   <footer class="foot">
-    <p class="mono tiny">Built on Azure AI Language &middot; sentiment, key phrases &amp; entities &middot; Python backend on Azure</p>
+    <p class="mono tiny">Built on Azure AI Language &middot; sentiment, key phrases, entities, language detection, PII &amp; summarization &middot; Python backend on Azure</p>
   </footer>
 
 <script>
@@ -350,6 +406,12 @@
   const barPos = document.getElementById('barPos');
   const barNeu = document.getElementById('barNeu');
   const barNeg = document.getElementById('barNeg');
+  const languageBadge = document.getElementById('languageBadge');
+  const summaryBlock = document.getElementById('summaryBlock');
+  const summaryContainer = document.getElementById('summaryContainer');
+  const piiBlock = document.getElementById('piiBlock');
+  const redactedText = document.getElementById('redactedText');
+  const piiList = document.getElementById('piiList');
 
   textarea.addEventListener('input', () => {
     charCount.textContent = `${textarea.value.length} characters`;
@@ -404,7 +466,7 @@
   }
 
   function renderResults(originalText, data) {
-    const { sentiment, confidenceScores, keyPhrases, entities } = data;
+    const { sentiment, confidenceScores, keyPhrases, entities, language, pii, summary } = data;
 
     stampBadge.textContent = sentiment.toUpperCase();
     stampBadge.className = 'stamp ' + sentiment.toLowerCase();
@@ -416,14 +478,42 @@
     barNeu.style.width = neu + '%';
     barNeg.style.width = neg + '%';
 
+    // Render language badge
+    if (language) {
+      const confPercent = Math.round((language.confidenceScore || 0) * 100);
+      languageBadge.textContent = `${language.name} (${language.iso6391Name.toUpperCase()}) · ${confPercent}%`;
+    } else {
+      languageBadge.textContent = '-';
+    }
+
     markedText.innerHTML = highlightPhrases(originalText, keyPhrases || []);
 
+    // Render named entities
     if (entities && entities.length) {
       entityList.innerHTML = entities
         .map(e => `<span class="entity-chip">${escapeHtml(e.text)}<span class="cat">${escapeHtml(e.category)}</span></span>`)
         .join('');
     } else {
       entityList.innerHTML = '<span class="entity-empty">no named entities found</span>';
+    }
+
+    // Render summary block if sentences are present
+    if (summary && summary.length) {
+      summaryContainer.innerHTML = summary.map(s => `• ${escapeHtml(s.text)}`).join('<br><br>');
+      summaryBlock.hidden = false;
+    } else {
+      summaryBlock.hidden = true;
+    }
+
+    // Render PII block if PII entities are present
+    if (pii && pii.entities && pii.entities.length) {
+      redactedText.textContent = pii.redactedText || originalText;
+      piiList.innerHTML = pii.entities
+        .map(e => `<span class="entity-chip" style="background: var(--rule);">${escapeHtml(e.text)}<span class="cat" style="color: var(--paper);">${escapeHtml(e.category)}</span></span>`)
+        .join('');
+      piiBlock.hidden = false;
+    } else {
+      piiBlock.hidden = true;
     }
 
     resultsSheet.hidden = false;
